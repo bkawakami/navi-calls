@@ -71,7 +71,8 @@ Para a Recall alcançar a página da assistente e os webhooks, o backend precisa
 # e cadastre https://xxxx.trycloudflare.com/api/webhooks/recall no dashboard da Recall (opcional: há polling de status)
 ```
 
-Roteiro completo da demonstração: `docs/RUNBOOK_DEMO.md`.
+Antes da demo, valide o ambiente: `python scripts/check_setup.py` (MongoDB, chave/região da Recall, modelos da
+OpenAI, URL pública e segredos). Roteiro completo da demonstração: `docs/RUNBOOK_DEMO.md`.
 
 ## Testes
 

@@ -20,7 +20,8 @@ Tempo de preparação: ~30 min na primeira vez. Faça um ensaio completo antes d
    ```
    Cadastre `https://....trycloudflare.com/api/webhooks/recall` no dashboard da Recall (eventos bot.*, transcript.done).
    Se preferir Cloud Run, siga `docs/DEPLOY_CLOUD_RUN.md` e use a URL do serviço.
-5. Ensaio: abra o painel, cole o link da reunião, **Adicionar Navi**, admita a Navi no Teams, fale com ela,
+5. `python scripts/check_setup.py` — tudo deve aparecer com ✅ (a chave da Recall é por região).
+6. Ensaio: abra o painel, cole o link da reunião, **Adicionar Navi**, admita a Navi no Teams, fale com ela,
    encerre e confira a ata. Em caso de problema, abra o Bot Explorer da Recall → Debug Data → Remote Devtools
    para ver o console da página da assistente.
 
