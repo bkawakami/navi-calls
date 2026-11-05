@@ -1,0 +1,7 @@
+.navi-orb {
+  background: radial-gradient(circle at 30% 30%, #a5f3fc, #6366f1 55%, #1e1b4b);
+  box-shadow: 0 0 24px rgba(99, 102, 241, 0.6);
+}
+[x-cloak] { display: none !important; }
+.transcript-scroll { max-height: 60vh; overflow-y: auto; scroll-behavior: smooth; }
+.badge { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium; }

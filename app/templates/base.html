@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Navi — Assistente de reuniões{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+  <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100 antialiased">
+  <header class="border-b border-slate-800 bg-slate-900/70 backdrop-blur">
+    <div class="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+      <a href="/" class="flex items-center gap-3">
+        <span class="navi-orb h-8 w-8 rounded-full"></span>
+        <span class="text-lg font-semibold tracking-tight">Navi <span class="text-slate-400 font-normal">| Assistente IA</span></span>
+      </a>
+      <nav class="flex items-center gap-4 text-sm text-slate-400">
+        <a href="/" class="hover:text-white">Reuniões</a>
+        {% if config %}<span class="hidden sm:inline text-xs">Região Recall: <b class="text-slate-200">{{ config.region }}</b></span>{% endif %}
+      </nav>
+    </div>
+  </header>
+  <main class="mx-auto max-w-6xl px-4 py-6">
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="mx-auto max-w-6xl px-4 py-8 text-xs text-slate-500">Prova de conceito · Recall.ai + OpenAI Realtime · Microsoft Teams</footer>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

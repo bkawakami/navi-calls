@@ -1,0 +1,9 @@
+{% set code = m.status %}
+{% set color = {
+  'created': 'bg-slate-700 text-slate-200', 'ready': 'bg-slate-700 text-slate-200',
+  'joining_call': 'bg-sky-900/60 text-sky-200', 'in_waiting_room': 'bg-amber-900/60 text-amber-200',
+  'in_call_not_recording': 'bg-emerald-900/60 text-emerald-200', 'in_call_recording': 'bg-emerald-900/60 text-emerald-200',
+  'recording_permission_allowed': 'bg-emerald-900/60 text-emerald-200', 'recording_permission_denied': 'bg-rose-900/60 text-rose-200',
+  'call_ended': 'bg-slate-700 text-slate-200', 'done': 'bg-slate-700 text-slate-200', 'fatal': 'bg-rose-900/60 text-rose-200'
+}.get(code, 'bg-slate-700 text-slate-200') %}
+<span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium {{ color }}">{{ m.status_label }}</span>

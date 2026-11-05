@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="grid gap-6 lg:grid-cols-3">
+  <section class="lg:col-span-2 space-y-6">
+    <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-6" x-data="addNavi()">
+      <h1 class="text-2xl font-semibold tracking-tight">Colocar a Navi em uma reunião do Teams</h1>
+      <p class="mt-1 text-sm text-slate-400">Cole o link da reunião. A Navi entra como “{{ config.bot_name }}”, ouve em silêncio, responde quando chamada pelo nome e gera a ata ao final.</p>
+      <form class="mt-5 space-y-3" @submit.prevent="submit()">
+        <div>
+          <label class="block text-xs font-medium text-slate-400">Link da reunião do Microsoft Teams</label>
+          <input x-model="meetingUrl" required placeholder="https://teams.microsoft.com/l/meetup-join/..." class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm placeholder:text-slate-600 focus:border-indigo-500 focus:outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-400">Título (opcional)</label>
+          <input x-model="title" placeholder="Ex.: Comitê de produto — novembro" class="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm placeholder:text-slate-600 focus:border-indigo-500 focus:outline-none">
+        </div>
+        <div class="flex items-center gap-3">
+          <button type="submit" :disabled="loading" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold hover:bg-indigo-500 disabled:opacity-50">
+            <span x-show="!loading">Adicionar Navi</span><span x-show="loading" x-cloak>Criando bot…</span>
+          </button>
+          <span class="text-xs text-slate-500">Se a reunião tiver lobby, admita “{{ config.bot_name }}” quando ela aparecer.</span>
+        </div>
+        <p x-show="error" x-cloak class="rounded-lg border border-rose-800 bg-rose-950/50 px-3 py-2 text-sm text-rose-200" x-text="error"></p>
+      </form>
+    </div>
+
+    <div class="rounded-2xl border border-slate-800 bg-slate-900/60">
+      <div class="flex items-center justify-between border-b border-slate-800 px-6 py-4">
+        <h2 class="font-semibold">Reuniões recentes</h2>
+        <span class="text-xs text-slate-500">{{ meetings|length }} registro(s)</span>
+      </div>
+      {% if meetings %}
+      <ul class="divide-y divide-slate-800">
+        {% for m in meetings %}
+        <li class="flex items-center justify-between gap-4 px-6 py-3 hover:bg-slate-800/40">
+          <div class="min-w-0">
+            <a href="/meetings/{{ m.id }}" class="block truncate font-medium hover:underline">{{ m.title or 'Reunião sem título' }}</a>
+            <p class="truncate text-xs text-slate-500">{{ m.created_at|datetime }} · {{ m.meeting_url }}</p>
+          </div>
+          <div class="flex items-center gap-3">
+            {% include "components/_status_badge.html" with context %}
+            {% if m.minutes_id %}<span class="rounded-full bg-emerald-900/50 px-2 py-0.5 text-xs text-emerald-200">ata</span>{% endif %}
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="px-6 py-8 text-center text-sm text-slate-500">Nenhuma reunião ainda.</p>
+      {% endif %}
+    </div>
+  </section>
+  <aside class="space-y-4">
+    {% include "components/_config_checklist.html" %}
+    <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-4 text-sm text-slate-300">
+      <h3 class="mb-2 font-semibold text-slate-200">Como chamar a Navi</h3>
+      <ul class="list-disc space-y-1 pl-5 text-slate-400">
+        <li>“<b class="text-slate-200">Navi</b>, o que você acha dessa proposta?”</li>
+        <li>“<b class="text-slate-200">Navi</b>, lembre-se de validar o contrato.”</li>
+        <li>“<b class="text-slate-200">Navi</b>, resume o que decidimos até agora.”</li>
+      </ul>
+      <p class="mt-3 text-xs text-slate-500">Ela aguarda o fim da frase, responde em poucos segundos e volta ao silêncio.</p>
+    </div>
+  </aside>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function addNavi() {
+  return {
+    meetingUrl: '', title: '', loading: false, error: '',
+    async submit() {
+      this.loading = true; this.error = '';
+      try {
+        const res = await fetch('/api/meetings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ meeting_url: this.meetingUrl, title: this.title }) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Falha ao criar o bot');
+        window.location.href = `/meetings/${data.meeting.id}`;
+      } catch (e) { this.error = e.message; }
+      this.loading = false;
+    }
+  }
+}
+</script>
+{% endblock %}

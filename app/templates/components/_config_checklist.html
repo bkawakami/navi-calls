@@ -1,0 +1,19 @@
+<div class="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+  <h3 class="mb-3 text-sm font-semibold text-slate-300">Checklist de configuração</h3>
+  <ul class="space-y-1.5 text-sm">
+    {% set items = [
+      (config.recall, "Chave da Recall.ai (RECALL_API_KEY)"),
+      (config.openai, "Chave da OpenAI (OPENAI_API_KEY)"),
+      (config.public_url, "URL pública (BASE_URL = " ~ config.base_url ~ ")"),
+      (config.realtime_secret, "Segredo dos webhooks em tempo real (RECALL_REALTIME_SECRET)"),
+      (config.webhook_secret, "Segredo Svix dos webhooks de status (RECALL_WEBHOOK_SECRET)")
+    ] %}
+    {% for ok, label in items %}
+    <li class="flex items-start gap-2">
+      <span class="mt-0.5 inline-block h-4 w-4 shrink-0 rounded-full {{ 'bg-emerald-500' if ok else 'bg-amber-500' }}"></span>
+      <span class="{{ 'text-slate-200' if ok else 'text-amber-200' }}">{{ label }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  <p class="mt-3 text-xs text-slate-500">Bot: <b>{{ config.bot_name }}</b> · Realtime: {{ config.realtime_model }} · Ata: {{ config.text_model }}</p>
+</div>

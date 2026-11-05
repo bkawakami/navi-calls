@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}{{ meeting.title or 'Reunião' }} — Navi{% endblock %}
+{% block content %}
+<div x-data='meetingPage({{ meeting.id|tojson }}, {{ (minutes is not none)|tojson }})' x-init="init()" class="space-y-6">
+
+  <!-- Cabeçalho -->
+  <div class="flex flex-wrap items-start justify-between gap-4">
+    <div class="min-w-0">
+      <h1 class="truncate text-2xl font-semibold tracking-tight">{{ meeting.title or 'Reunião sem título' }}</h1>
+      <p class="mt-1 truncate text-xs text-slate-500">{{ meeting.meeting_url }}</p>
+      <p class="mt-1 text-xs text-slate-500">Bot Recall: <code class="text-slate-300" x-text="meeting.bot_id || '—'"></code> · criada em {{ meeting.created_at|datetime }}</p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <span class="inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-medium" :class="statusClass()">
+        <span class="h-2 w-2 rounded-full" :class="isLive() ? 'bg-emerald-400 animate-pulse' : 'bg-slate-400'"></span>
+        <span x-text="meeting.status_label"></span>
+      </span>
+      <button @click="refresh()" class="rounded-lg border border-slate-700 px-3 py-1.5 text-sm hover:bg-slate-800">Atualizar status</button>
+      <template x-if="!isEnded()">
+        <button @click="leave()" :disabled="busy" class="rounded-lg bg-rose-600 px-3 py-1.5 text-sm font-semibold hover:bg-rose-500 disabled:opacity-50">Encerrar e gerar ata</button>
+      </template>
+      <template x-if="isEnded()">
+        <button @click="generate(hasMinutes)" :disabled="busy" class="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-semibold hover:bg-indigo-500 disabled:opacity-50">
+          <span x-text="busy ? 'Gerando ata…' : (hasMinutes ? 'Regerar ata' : 'Gerar ata')"></span>
+        </button>
+      </template>
+    </div>
+  </div>
+
+  <!-- Avisos de estado -->
+  <div x-show="meeting.status === 'in_waiting_room'" x-cloak class="rounded-xl border border-amber-700 bg-amber-950/40 px-4 py-3 text-sm text-amber-100">
+    A Navi está no <b>lobby</b> do Teams. Admita a participante “{{ meeting.bot_name }}” para que ela comece a ouvir.
+  </div>
+  <div x-show="meeting.status === 'fatal'" x-cloak class="rounded-xl border border-rose-800 bg-rose-950/40 px-4 py-3 text-sm text-rose-100">
+    O bot falhou: <span x-text="meeting.status_sub_code || meeting.error || 'sem detalhe'"></span>. Verifique as condições de entrada (docs/TEAMS.md) e tente novamente.
+  </div>
+  <div x-show="flash" x-cloak class="rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm" x-text="flash"></div>
+
+  <div class="grid gap-6 lg:grid-cols-3">
+    <!-- Transcrição -->
+    <section class="lg:col-span-2 rounded-2xl border border-slate-800 bg-slate-900/60">
+      <div class="flex items-center justify-between border-b border-slate-800 px-5 py-3">
+        <h2 class="font-semibold">Transcrição ao vivo</h2>
+        <div class="flex items-center gap-3 text-xs text-slate-500">
+          <span>Recall: <b class="text-slate-300" x-text="counts.recall || 0"></b></span>
+          <span>OpenAI: <b class="text-slate-300" x-text="counts.openai || 0"></b></span>
+          <span>Navi: <b class="text-slate-300" x-text="counts.navi || 0"></b></span>
+          <label class="flex items-center gap-1"><input type="checkbox" x-model="showOpenai" class="accent-indigo-500"> mostrar OpenAI</label>
+        </div>
+      </div>
+      <div class="transcript-scroll px-5 py-3 space-y-2" x-ref="scroll">
+        <template x-if="visibleSegments().length === 0">
+          <p class="py-10 text-center text-sm text-slate-500">Aguardando falas… Assim que a Navi estiver na reunião e alguém falar, a transcrição aparece aqui.</p>
+        </template>
+        <template x-for="s in visibleSegments()" :key="s.id">
+          <div class="flex gap-3 text-sm" :class="s.source === 'navi' ? 'rounded-lg bg-indigo-950/50 px-2 py-1' : ''">
+            <span class="w-14 shrink-0 font-mono text-xs text-slate-500" x-text="fmt(s.start_ts)"></span>
+            <div class="min-w-0">
+              <span class="font-semibold" :class="s.source === 'navi' ? 'text-indigo-300' : 'text-slate-200'" x-text="s.speaker || (s.source === 'openai' ? 'Participante (OpenAI)' : 'Participante')"></span>
+              <span class="text-slate-300" x-text="' ' + s.text"></span>
+            </div>
+          </div>
+        </template>
+      </div>
+    </section>
+
+    <!-- Lateral: notas e intervenções -->
+    <aside class="space-y-4">
+      <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+        <h3 class="font-semibold">Notas da Navi <span class="text-xs text-slate-500" x-text="'(' + notes.length + ')'"></span></h3>
+        <ul class="mt-2 space-y-1.5 text-sm">
+          <template x-if="notes.length === 0"><li class="text-slate-500">Diga “Navi, lembre-se de …” para registrar uma nota.</li></template>
+          <template x-for="n in notes" :key="n.id"><li class="flex gap-2"><span class="text-indigo-400">•</span><span x-text="n.text"></span></li></template>
+        </ul>
+      </div>
+      <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+        <h3 class="font-semibold">Intervenções</h3>
+        <ul class="mt-2 space-y-2 text-sm">
+          <template x-if="interactions().length === 0"><li class="text-slate-500">Nenhum chamado ainda.</li></template>
+          <template x-for="e in interactions()" :key="e.id">
+            <li class="rounded-lg border border-slate-800 p-2">
+              <template x-if="e.type === 'wake_detected'"><p class="text-slate-300"><span class="text-xs uppercase text-amber-400">chamado</span> <span x-text="e.payload.text"></span></p></template>
+              <template x-if="e.type === 'navi_response'"><p class="text-indigo-200"><span class="text-xs uppercase text-indigo-400">navi</span> <span x-text="e.payload.transcript"></span></p></template>
+            </li>
+          </template>
+        </ul>
+      </div>
+      <div class="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 text-xs text-slate-400">
+        <h3 class="mb-2 font-semibold text-slate-200">Conexão da assistente</h3>
+        <ul class="space-y-1">
+          <template x-for="e in connectionEvents()" :key="e.id"><li><span class="font-mono text-slate-500" x-text="time(e.created_at)"></span> <span x-text="e.type.replace('realtime_', '')"></span> <span class="text-slate-500" x-text="e.payload.message || ''"></span></li></template>
+        </ul>
+        <p class="mt-2">Histórico de status: <template x-for="h in meeting.status_history" :key="h.at + h.code"><span class="mr-1 inline-block rounded bg-slate-800 px-1.5 py-0.5" x-text="h.code"></span></template></p>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Ata -->
+  <section class="rounded-2xl border border-slate-800 bg-slate-900/60" id="ata">
+    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 px-5 py-3">
+      <h2 class="font-semibold">Ata e backlog</h2>
+      <div class="flex flex-wrap gap-2 text-xs">
+        <a :href="`/api/meetings/${meetingId}/export/minutes.md`" class="rounded border border-slate-700 px-2 py-1 hover:bg-slate-800" :class="!hasMinutes && 'pointer-events-none opacity-40'">Baixar .md</a>
+        <a :href="`/api/meetings/${meetingId}/export/minutes.docx`" class="rounded border border-slate-700 px-2 py-1 hover:bg-slate-800" :class="!hasMinutes && 'pointer-events-none opacity-40'">Baixar .docx</a>
+        <a :href="`/api/meetings/${meetingId}/export/minutes.json`" class="rounded border border-slate-700 px-2 py-1 hover:bg-slate-800" :class="!hasMinutes && 'pointer-events-none opacity-40'">Baixar .json</a>
+        <a :href="`/api/meetings/${meetingId}/export/transcript.txt`" class="rounded border border-slate-700 px-2 py-1 hover:bg-slate-800">Transcrição .txt</a>
+        <a :href="`/api/meetings/${meetingId}/export/transcript.json`" class="rounded border border-slate-700 px-2 py-1 hover:bg-slate-800">Transcrição .json</a>
+      </div>
+    </div>
+    <div class="px-5 py-4">
+      <template x-if="!minutes">
+        <p class="text-sm text-slate-500">A ata é gerada automaticamente quando a reunião termina (ou ao clicar em “Encerrar e gerar ata”).</p>
+      </template>
+      <template x-if="minutes">
+        <div class="space-y-6 text-sm">
+          <div>
+            <h3 class="text-lg font-semibold" x-text="minutes.ata.titulo"></h3>
+            <p class="text-xs text-slate-500">Gerada em <span x-text="time(minutes.generated_at, true)"></span> · modelo <span x-text="minutes.model"></span> · <span x-text="minutes.segments_count"></span> segmentos</p>
+            <p class="mt-1 text-xs text-slate-500" x-show="minutes.ata.participantes && minutes.ata.participantes.length">Participantes: <span x-text="(minutes.ata.participantes || []).join(', ')"></span></p>
+          </div>
+          <div><h4 class="mb-1 font-semibold text-slate-200">Resumo</h4><p class="whitespace-pre-line text-slate-300" x-text="minutes.ata.resumo"></p></div>
+          <div class="grid gap-6 md:grid-cols-2">
+            <div>
+              <h4 class="mb-1 font-semibold text-slate-200">Decisões</h4>
+              <ul class="space-y-2">
+                <template x-if="!minutes.ata.decisoes.length"><li class="text-slate-500">Nenhuma decisão registrada.</li></template>
+                <template x-for="(d, i) in minutes.ata.decisoes" :key="'d' + i"><li><p x-text="d.descricao"></p><p class="text-xs text-slate-500" x-text="'Origem: ' + d.referencia"></p></li></template>
+              </ul>
+            </div>
+            <div>
+              <h4 class="mb-1 font-semibold text-slate-200">Pendências</h4>
+              <ul class="space-y-2">
+                <template x-if="!minutes.ata.pendencias.length"><li class="text-slate-500">Nenhuma pendência registrada.</li></template>
+                <template x-for="(p, i) in minutes.ata.pendencias" :key="'p' + i"><li><p x-text="p.descricao"></p><p class="text-xs text-slate-500"><span x-text="'Responsável: ' + p.responsavel"></span> · <span x-text="'Origem: ' + p.referencia"></span></p></li></template>
+              </ul>
+            </div>
+          </div>
+          <div>
+            <h4 class="mb-2 font-semibold text-slate-200">Tarefas (backlog)</h4>
+            <template x-if="!minutes.ata.tarefas.length"><p class="text-slate-500">Nenhuma tarefa registrada.</p></template>
+            <div class="overflow-x-auto" x-show="minutes.ata.tarefas.length">
+              <table class="w-full text-left text-sm">
+                <thead class="text-xs uppercase text-slate-500"><tr><th class="py-2 pr-3">#</th><th class="py-2 pr-3">Descrição</th><th class="py-2 pr-3">Responsável</th><th class="py-2 pr-3">Prazo</th><th class="py-2">Origem</th></tr></thead>
+                <tbody class="divide-y divide-slate-800">
+                  <template x-for="(t, i) in minutes.ata.tarefas" :key="'t' + i">
+                    <tr><td class="py-2 pr-3 text-slate-500" x-text="i + 1"></td><td class="py-2 pr-3" x-text="t.descricao"></td><td class="py-2 pr-3" :class="t.responsavel === 'a definir' && 'text-amber-300'" x-text="t.responsavel"></td><td class="py-2 pr-3" :class="t.prazo === 'a definir' && 'text-amber-300'" x-text="t.prazo"></td><td class="py-2 text-xs text-slate-500" x-text="t.referencia"></td></tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div x-show="minutes.notes && minutes.notes.length">
+            <h4 class="mb-1 font-semibold text-slate-200">Notas pedidas à Navi</h4>
+            <ul class="list-disc pl-5 text-slate-300"><template x-for="(n, i) in minutes.notes" :key="'n' + i"><li x-text="n"></li></template></ul>
+          </div>
+        </div>
+      </template>
+    </div>
+  </section>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/meeting.js"></script>
+{% endblock %}
